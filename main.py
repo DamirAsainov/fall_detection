@@ -5,7 +5,8 @@ import math
 
 model = YOLO("yolo11n-pose.pt")
 
-cap = cv2.VideoCapture(r"C:\Users\Alser\Downloads\Watch Your Step! Funny Slips and Falls Compilation _ FailArmy.mp4")
+cap = cv2.VideoCapture('rtsp://admin:The2ndlaw@192.168.1.201')
+screenshot_counter = 0
 
 
 def detect_fall(keypoints, bbox):
@@ -45,6 +46,10 @@ while cap.isOpened():
     if not ret:
         break
 
+    target_width = 1280
+    scale_factor = target_width / frame.shape[1]
+    frame = cv2.resize(frame, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_AREA)
+
     results = model(frame)
     frame = results[0].plot()
 
@@ -65,6 +70,10 @@ while cap.isOpened():
                 cv2.rectangle(frame, (int(xmin), int(ymin)), (int(xmax), int(ymax)), color=(0, 0, 255), thickness=3)
                 cv2.putText(frame, "FALL DETECTED!", (int(xmin), int(ymin) - 20),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                screenshot_path = f"screenshots/fall_detection_{screenshot_counter}.jpg"
+                cv2.imwrite(screenshot_path, frame)
+                print(f"Saved screenshot: {screenshot_path}")
+                screenshot_counter += 1
 
     # if results[0].keypoints is not None:
     #     keypoints = results[0].keypoints.data[0].cpu().numpy()
