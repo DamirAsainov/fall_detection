@@ -21,10 +21,10 @@ def generate_video(source):
 
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
-    contents = await file.read()
-    np_arr = np.frombuffer(contents, np.uint8)
-    frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-    return StreamingResponse(generate_video(frame), media_type="multipart/x-mixed-replace; boundary=frame")
+    file_path = f"uploads/{file.filename}"
+    with open(file_path, "wb") as buffer:
+        buffer.write(await file.read())
+    return {"success": True, "file_path": file_path}
 
 
 @app.get("/stream")

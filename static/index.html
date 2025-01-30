@@ -15,7 +15,7 @@
     <br><br>
 
     <label for="video-file">Upload Video:</label>
-    <input type="file" id="video-file" accept="video/*">
+    <input type="file" id="video-file" >
     <button onclick="uploadVideo()">Upload & Start Processing</button>
 
     <br><br>
@@ -44,13 +44,13 @@
             let formData = new FormData();
             formData.append("file", file);
 
-            fetch("/upload_video", {
+            fetch("/upload", {
                 method: "POST",
                 body: formData
             }).then(response => response.json())
               .then(data => {
                   if (data.success) {
-                      document.getElementById("video-feed").src = `/video_feed?file_path=${data.file_path}`;
+                      document.getElementById("video-feed").src = `/stream/?camera_url=${encodeURIComponent(data.file_path)}`;
                   } else {
                       alert("Error processing video");
                   }
