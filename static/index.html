@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fall Detection</title>
+</head>
+<body>
+    <h1>Fall Detection Video Stream</h1>
+
+    <label for="camera-url">Enter Camera URL:</label>
+    <input type="text" id="camera-url" placeholder="rtsp://your_camera_url">
+    <button onclick="startCameraStream()">Start Camera Stream</button>
+
+    <br><br>
+
+    <label for="video-file">Upload Video:</label>
+    <input type="file" id="video-file" accept="video/*">
+    <button onclick="uploadVideo()">Upload & Start Processing</button>
+
+    <br><br>
+
+    <h2>Processed Video Stream</h2>
+    <img id="video-feed" width="640" height="480" alt="Video Stream will appear here">
+
+    <script>
+        function startCameraStream() {
+            let cameraUrl = document.getElementById("camera-url").value;
+            if (!cameraUrl) {
+                alert("Please enter a valid camera URL");
+                return;
+            }
+            document.getElementById("video-feed").src = `/stream/?camera_url=${encodeURIComponent(cameraUrl)}`;
+        }
+
+        function uploadVideo() {
+            let fileInput = document.getElementById("video-file");
+            let file = fileInput.files[0];
+            if (!file) {
+                alert("Please select a video file to upload");
+                return;
+            }
+
+            let formData = new FormData();
+            formData.append("file", file);
+
+            fetch("/upload_video", {
+                method: "POST",
+                body: formData
+            }).then(response => response.json())
+              .then(data => {
+                  if (data.success) {
+                      document.getElementById("video-feed").src = `/video_feed?file_path=${data.file_path}`;
+                  } else {
+                      alert("Error processing video");
+                  }
+              });
+        }
+    </script>
+</body>
+</html>

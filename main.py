@@ -1,100 +1,44 @@
-from ultralytics import YOLO
-#import numpy as np
+from fastapi import FastAPI, UploadFile, File, Request
+from fastapi.responses import StreamingResponse, HTMLResponse
 import cv2
-import math
+import numpy as np
+import uvicorn
+from ml.fall_detector import FallDetector
 
-model = YOLO("yolo11n-pose.pt")
+app = FastAPI()
+fall_detector = FallDetector()
 
-cap = cv2.VideoCapture('rtsp://admin:The2ndlaw@192.168.1.201')
-screenshot_counter = 0
+def generate_video(source):
+    cap = cv2.VideoCapture(source)
+    while cap.isOpened():
+        success, frame = cap.read()
+        if not success:
+            break
+        processed_frame = fall_detector.process_frame(frame)
+        _, buffer = cv2.imencode(".jpg", processed_frame)
+        yield (b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n")
+    cap.release()
 
-
-def detect_fall(keypoints, bbox):
-    try:
-        left_shoulder_y = keypoints[6][1]
-        left_hip_y = keypoints[12][1]
-        left_foot_y = keypoints[16][1]
-        # left_shoulder_z = keypoints[6][2]
-        # left_hip_z = keypoints[12][2]
-        # left_foot_z = keypoints[16][2]
-
-        xmin, ymin, xmax, ymax = bbox
-        if xmax - xmin >= (ymax - ymin) * 1.15:
-            return True
-
-        len_factor = left_shoulder_y - left_hip_y
-        print("Len_factor", len_factor)
-        print(left_shoulder_y > left_foot_y - len_factor,left_hip_y > left_foot_y - (len_factor / 2), left_shoulder_y > left_hip_y - (len_factor / 2) )
-        print("Left Sholder", left_shoulder_y, "Left foot", left_foot_y, "left body", left_hip_y)
-
-        if (
-                left_shoulder_y > left_foot_y - len_factor
-                and left_hip_y > left_foot_y - (len_factor / 2)
-                and left_shoulder_y > left_hip_y - (len_factor / 2)
-        ):
-            return True
-
-        # print(left_shoulder_z, left_hip_z, left_foot_z)
-        return False
-    except IndexError as e:
-        print("Problem with keypoints:", e)
-        return False
+@app.post("/upload/")
+async def upload_file(file: UploadFile = File(...)):
+    contents = await file.read()
+    np_arr = np.frombuffer(contents, np.uint8)
+    frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    return StreamingResponse(generate_video(frame), media_type="multipart/x-mixed-replace; boundary=frame")
 
 
-while cap.isOpened():
-    ret, frame = cap.read()
-    if not ret:
-        break
+@app.get("/stream")
+async def stream_video(request: Request):
+    camera_url = request.query_params.get("camera_url")
+    if not camera_url:
+        return {"error": "camera_url is required"}
 
-    target_width = 1280
-    scale_factor = target_width / frame.shape[1]
-    frame = cv2.resize(frame, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_AREA)
+    print(camera_url)
+    return StreamingResponse(generate_video(camera_url), media_type="multipart/x-mixed-replace; boundary=frame")
 
-    results = model(frame)
-    frame = results[0].plot()
+@app.get("/")
+def main_page():
+    return HTMLResponse(open("static/index.html").read())
 
-    for result in results:
-        if result.keypoints is not None:
-            keypoints = results[0].keypoints.data[0].cpu().numpy()
-
-            xmin = 0
-            ymin = 0
-            xmax = 0
-            ymax = 0
-            bbox = None
-            if results[0].boxes.xyxy is not None and len(results[0].boxes.xyxy) > 0:
-                bbox = results[0].boxes.xyxy[0].cpu().numpy()
-                xmin, ymin, xmax, ymax = bbox
-
-            if detect_fall(keypoints, bbox):
-                cv2.rectangle(frame, (int(xmin), int(ymin)), (int(xmax), int(ymax)), color=(0, 0, 255), thickness=3)
-                cv2.putText(frame, "FALL DETECTED!", (int(xmin), int(ymin) - 20),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-                screenshot_path = f"screenshots/fall_detection_{screenshot_counter}.jpg"
-                cv2.imwrite(screenshot_path, frame)
-                print(f"Saved screenshot: {screenshot_path}")
-                screenshot_counter += 1
-
-    # if results[0].keypoints is not None:
-    #     keypoints = results[0].keypoints.data[0].cpu().numpy()
-    #
-    #     xmin = 0
-    #     ymin = 0
-    #     xmax = 0
-    #     ymax = 0
-    #     bbox = None
-    #     if results[0].boxes.xyxy is not None and len(results[0].boxes.xyxy) > 0:
-    #         bbox = results[0].boxes.xyxy[0].cpu().numpy()
-    #         xmin, ymin, xmax, ymax = bbox
-    #
-    #     if detect_fall(keypoints, bbox):
-    #         cv2.rectangle(frame, (int(xmin), int(ymin)), (int(xmax), int(ymax)), color=(0, 0, 255), thickness=3)
-    #         cv2.putText(frame, "FALL DETECTED!", (int(xmin), int(ymin) - 20),
-    #                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-
-    cv2.imshow("Fall Detection", frame)
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-cap.release()
-cv2.destroyAllWindows()
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
