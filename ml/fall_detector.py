@@ -3,19 +3,18 @@ import cv2
 
 
 class FallDetector:
-    def __init__(self, model_path="yolo11s-pose.pt"):
+    def __init__(self, model_path="yolo11n-pose.pt"):
         self.model = YOLO(model_path)
 
     def detect_fall(self, keypoints, bbox):
         try:
-            required_points = [5, 6, 11, 12, 15, 16]  # Плечи, бедра, стопы
-            visible_points = [point for point in required_points if keypoints[point][2] >= 0.5]
+            required_points = [5, 6, 11, 12, 15, 16]
+            visible_points = [point for point in required_points if keypoints[point][2] >= 0.4]
 
-            if len(visible_points) < 4:  # Если меньше 4 точек видно, пропускаем
-                print("Недостаточно видимых ключевых точек")
+            if len(visible_points) < 4:
+                print("Недостаточно точек")
                 return False
 
-            # Используем только видимые точки
             left_shoulder_y = keypoints[5][1] if 5 in visible_points else None
             right_shoulder_y = keypoints[6][1] if 6 in visible_points else None
             left_hip_y = keypoints[11][1] if 11 in visible_points else None
@@ -23,7 +22,6 @@ class FallDetector:
             left_foot_y = keypoints[15][1] if 15 in visible_points else None
             right_foot_y = keypoints[16][1] if 16 in visible_points else None
 
-            # Средние значения для устойчивости
             shoulder_y = (left_shoulder_y + right_shoulder_y) / 2 if left_shoulder_y and right_shoulder_y else None
             hip_y = (left_hip_y + right_hip_y) / 2 if left_hip_y and right_hip_y else None
             foot_y = (left_foot_y + right_foot_y) / 2 if left_foot_y and right_foot_y else None
@@ -32,12 +30,10 @@ class FallDetector:
             bbox_width = xmax - xmin
             bbox_height = ymax - ymin
 
-
             if bbox_width > bbox_height * 1.5:
                 print("Wide bbox, fall detected")
                 return True
 
-            # Проверка на положение тела
             if shoulder_y and hip_y and foot_y:
                 len_factor = shoulder_y - hip_y
 
@@ -57,7 +53,6 @@ class FallDetector:
         except IndexError as e:
             print("Error with keypoint:", e)
             return False
-
 
     def process_frame(self, frame):
         results = self.model(frame)
