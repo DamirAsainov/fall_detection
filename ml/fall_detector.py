@@ -1,10 +1,14 @@
 from ultralytics import YOLO
 import cv2
+import numpy as np
 
 
 class FallDetector:
     def __init__(self, model_path="yolo11n-pose.pt"):
         self.model = YOLO(model_path)
+
+    def calculate_angle(self, p1, p2):
+        return np.arctan2(p2[1] - p1[1], p2[0] - p1[0]) * (180 / np.pi)
 
     def detect_fall(self, keypoints, bbox):
         try:
@@ -49,6 +53,19 @@ class FallDetector:
                     print("Fall Detected")
                     return True
 
+            if left_shoulder_y and left_hip_y and right_shoulder_y and right_hip_y:
+                angle_shoulder_hip = abs(
+                    self.calculate_angle(left_shoulder_y, left_hip_y) - self.calculate_angle(right_shoulder_y, right_hip_y))
+                if angle_shoulder_hip > 60:
+                    print("Fall detected by shoulder-hip angle")
+                    return True
+
+            if left_hip_y and left_foot_y and right_hip_y and right_foot_y:
+                angle_hip_foot = abs(
+                    self.calculate_angle(left_hip_y, left_foot_y) - self.calculate_angle(right_hip_y, right_foot_y))
+                if angle_hip_foot > 60:
+                    print("Fall detected by hip-foot angle")
+                    return True
             return False
         except IndexError as e:
             print("Error with keypoint:", e)
