@@ -1,9 +1,10 @@
 from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.responses import StreamingResponse, HTMLResponse
 import cv2
-import numpy as np
 import uvicorn
 from ml.fall_detector import FallDetector
+
+
 
 app = FastAPI()
 fall_detector = FallDetector()

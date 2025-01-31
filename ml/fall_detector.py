@@ -1,11 +1,13 @@
 from ultralytics import YOLO
 import cv2
 import numpy as np
-
+import torch
 
 class FallDetector:
     def __init__(self, model_path="yolo11n-pose.pt"):
-        self.model = YOLO(model_path)
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        print(f"Using device: {self.device}")
+        self.model = YOLO(model_path).to(self.device)
 
     def calculate_angle(self, p1, p2):
         return np.arctan2(p2[1] - p1[1], p2[0] - p1[0]) * (180 / np.pi)
